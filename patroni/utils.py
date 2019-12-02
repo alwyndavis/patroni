@@ -412,3 +412,25 @@ def cluster_as_json(cluster):
         if cluster.failover.candidate:
             ret['scheduled_switchover']['to'] = cluster.failover.candidate
     return ret
+
+def is_cluster_healthy(cluster):
+    if cluster.leader:
+        leader_name = cluster.leader.member.name
+    else:
+        return False
+    for m in cluster.members:
+        if m.name == leader_name:
+            leader_tl = m.data.get('timeline', '')
+            # sanity check
+            if m.data.get('role', '') != 'master' or m.data.get('state', '') != 'running':
+                return False
+    if cluster.config:
+        maximum_lag_on_failover = cluster.config.data.get('maximum_lag_on_failover', 0)
+    for m in cluster.members:
+        if m.name == leader_name:
+            continue
+        if m.data.get('timeline', '') != leader_tl or int(m.data.get('lag', 0)) > maximum_lag_on_failover:
+            return False
+        if m.data.get('state', '') != 'running' or m.data.get('role', '') != 'replica':
+            return False
+    return True
