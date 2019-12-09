@@ -383,7 +383,7 @@ def cluster_as_json(cluster):
         elif m.name == cluster.sync.sync_standby:
             role = 'sync_standby'
         else:
-            role = 'replica'
+            role = m.data.get('role', '')
 
         conn_kwargs = m.conn_kwargs()
         member = {'name': m.name, 'host': conn_kwargs['host'], 'port': int(conn_kwargs['port']),
