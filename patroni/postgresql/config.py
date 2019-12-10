@@ -6,8 +6,8 @@ import socket
 import stat
 import time
 
-from collections import MutableMapping, OrderedDict
 from six.moves.urllib_parse import urlparse, parse_qsl, unquote
+from urllib3.response import HTTPHeaderDict
 
 from ..dcs import slot_name_from_member_name, RemoteMember
 from ..utils import compare_values, parse_bool, parse_int, split_host_port, uri
@@ -250,29 +250,19 @@ class ConfigWriter(object):
         self.writeline("{0} = '{1}'".format(param, self.escape(value)))
 
 
-class CaseInsensitiveDict(MutableMapping):
+class CaseInsensitiveDict(HTTPHeaderDict):
 
-    def __init__(self, data):
-        self._store = OrderedDict()
-        self.update(data)
-
-    def __setitem__(self, key, value):
-        self._store[key.lower()] = (key, value)
+    def add(self, key, val):
+        self[key] = val
 
     def __getitem__(self, key):
-        return self._store[key.lower()][1]
+        return self._container[key.lower()][1]
 
-    def __delitem__(self, key):
-        del self._store[key.lower()]
-
-    def __iter__(self):
-        return (casedkey for casedkey, mappedvalue in self._store.values())
-
-    def __len__(self):
-        return len(self._store)
+    def __repr__(self):
+        return str(dict(self.items()))
 
     def copy(self):
-        return CaseInsensitiveDict(self._store.values())
+        return CaseInsensitiveDict(self._container.values())
 
 
 class ConfigHandler(object):
@@ -490,17 +480,22 @@ class ConfigHandler(object):
 
     def format_dsn(self, params, include_dbname=False):
         # A list of keywords that can be found in a conninfo string. Follows what is acceptable by libpq
-        keywords = ('user', 'passfile' if params.get('passfile') else 'password', 'host', 'port', 'sslmode',
+        keywords = ('dbname', 'user', 'passfile' if params.get('passfile') else 'password', 'host', 'port', 'sslmode',
                     'sslcompression', 'sslcert', 'sslkey', 'sslrootcert', 'sslcrl', 'application_name', 'krbsrvname')
         if include_dbname:
             params = params.copy()
             params['dbname'] = params.get('database') or self._postgresql.database
-            keywords = ('dbname',) + keywords
+            # we are abusing information about the necessity of dbname
+            # dsn should contain passfile or password only if there is no dbname in it (it is used in recovery.conf)
+            skip = {'passfile', 'password'}
+        else:
+            skip = {'dbname'}
 
         def escape(value):
             return re.sub(r'([\'\\ ])', r'\\\1', str(value))
 
-        return ' '.join('{0}={1}'.format(kw, escape(params[kw])) for kw in keywords if params.get(kw) is not None)
+        return ' '.join('{0}={1}'.format(kw, escape(params[kw])) for kw in keywords
+                        if kw not in skip and params.get(kw) is not None)
 
     def _write_recovery_params(self, fd, recovery_params):
         for name, value in sorted(recovery_params.items()):

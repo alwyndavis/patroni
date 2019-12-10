@@ -222,7 +222,7 @@ class TestPostgresql(BaseTestPostgresql):
             mock_get_pg_settings.return_value['recovery_min_apply_delay'][1] = '1'
             self.assertEqual(self.p.config.check_recovery_conf(None), (True, True))
             mock_get_pg_settings.return_value['primary_conninfo'][1] = 'host=1 passfile='\
-                    + re.sub(r'([\'\\ ])', r'\\\1', self.p.config._pgpass)
+                + re.sub(r'([\'\\ ])', r'\\\1', self.p.config._pgpass)
             mock_get_pg_settings.return_value['recovery_min_apply_delay'][1] = '0'
             self.assertEqual(self.p.config.check_recovery_conf(None), (True, True))
             self.p.config.write_recovery_conf({'standby_mode': 'on', 'primary_conninfo': conninfo.copy()})
@@ -622,7 +622,7 @@ class TestPostgresql(BaseTestPostgresql):
         config['synchronous_mode_strict'] = True
         self.p.config.get_server_parameters(config)
         self.p.config.set_synchronous_standby('foo')
-        self.p.config.get_server_parameters(config)
+        self.assertTrue(str(self.p.config.get_server_parameters(config)).startswith('{'))
 
     @patch('time.sleep', Mock())
     def test__wait_for_connection_close(self):
