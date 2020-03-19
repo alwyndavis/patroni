@@ -1232,7 +1232,7 @@ def cluster_health(obj, cluster_name):
             click.echo('cluster is healthy')
             return
         else:
-	    click.echo('cluster has leader but is not healthy')
+            click.echo('cluster has leader but is not healthy')
             sys.exit(1)
     click.echo('cluster is not healthy')
     sys.exit(2)
